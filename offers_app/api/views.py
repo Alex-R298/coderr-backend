@@ -1,3 +1,4 @@
+from django.db.models import Min
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
@@ -16,11 +17,9 @@ from offers_app.models import Offer, OfferDetail
 class OfferListCreateView(generics.ListCreateAPIView):
     """List all offers (public) or create a new offer (business only)."""
 
-    queryset = Offer.objects.all()
     pagination_class = LargeResultsSetPagination
     permission_classes = [IsAuthenticatedOrReadOnly, IsBusinessUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['user']
     search_fields = ['title', 'description']
     ordering_fields = ['updated_at', 'min_price']
 
@@ -30,10 +29,18 @@ class OfferListCreateView(generics.ListCreateAPIView):
         return OfferListSerializer
 
     def get_queryset(self):
-        queryset = Offer.objects.all()
-        creator_id = self.request.query_params.get('creator_id')
-        if creator_id:
-            queryset = queryset.filter(user_id=creator_id)
+        """Applies creator_id, min_price and max_delivery_time filters."""
+        queryset = Offer.objects.all().annotate(
+            min_price=Min('details__price'),
+            min_delivery_time=Min('details__delivery_time_in_days'),
+        ).order_by('-created_at')
+        params = self.request.query_params
+        if params.get('creator_id'):
+            queryset = queryset.filter(user_id=params['creator_id'])
+        if params.get('min_price'):
+            queryset = queryset.filter(min_price__gte=params['min_price'])
+        if params.get('max_delivery_time'):
+            queryset = queryset.filter(min_delivery_time__lte=params['max_delivery_time'])
         return queryset
 
     def perform_create(self, serializer):

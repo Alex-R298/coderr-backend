@@ -24,7 +24,7 @@ class OfferDetailHyperlinkSerializer(serializers.ModelSerializer):
         fields = ['id', 'url']
 
     def get_url(self, obj):
-        return f'/offerdetails/{obj.id}/'
+        return f'/api/offerdetails/{obj.id}/'
 
 
 class OfferListSerializer(serializers.ModelSerializer):
