@@ -1,3 +1,4 @@
+from django.urls import reverse
 from rest_framework import serializers
 
 from offers_app.models import Offer, OfferDetail
@@ -24,10 +25,22 @@ class OfferDetailHyperlinkSerializer(serializers.ModelSerializer):
         fields = ['id', 'url']
 
     def get_url(self, obj):
-        return f'/api/offerdetails/{obj.id}/'
+        return reverse('offerdetail', args=[obj.id])
 
 
-class OfferListSerializer(serializers.ModelSerializer):
+class OfferMinFieldsMixin:
+    """Reusable min_price / min_delivery_time helpers for offer serializers."""
+
+    def get_min_price(self, obj):
+        prices = [d.price for d in obj.details.all()]
+        return min(prices) if prices else None
+
+    def get_min_delivery_time(self, obj):
+        times = [d.delivery_time_in_days for d in obj.details.all()]
+        return min(times) if times else None
+
+
+class OfferListSerializer(OfferMinFieldsMixin, serializers.ModelSerializer):
     """Paginated list serializer with min_price, min_delivery_time, user_details."""
 
     details = OfferDetailHyperlinkSerializer(many=True, read_only=True)
@@ -43,14 +56,6 @@ class OfferListSerializer(serializers.ModelSerializer):
             'min_price', 'min_delivery_time', 'user_details',
         ]
 
-    def get_min_price(self, obj):
-        prices = [d.price for d in obj.details.all()]
-        return min(prices) if prices else None
-
-    def get_min_delivery_time(self, obj):
-        times = [d.delivery_time_in_days for d in obj.details.all()]
-        return min(times) if times else None
-
     def get_user_details(self, obj):
         return {
             'first_name': obj.user.first_name,
@@ -59,7 +64,7 @@ class OfferListSerializer(serializers.ModelSerializer):
         }
 
 
-class OfferRetrieveSerializer(serializers.ModelSerializer):
+class OfferRetrieveSerializer(OfferMinFieldsMixin, serializers.ModelSerializer):
     """Retrieve serializer for a single offer with hyperlinked details."""
 
     details = OfferDetailHyperlinkSerializer(many=True, read_only=True)
@@ -74,14 +79,6 @@ class OfferRetrieveSerializer(serializers.ModelSerializer):
             'min_price', 'min_delivery_time',
         ]
 
-    def get_min_price(self, obj):
-        prices = [d.price for d in obj.details.all()]
-        return min(prices) if prices else None
-
-    def get_min_delivery_time(self, obj):
-        times = [d.delivery_time_in_days for d in obj.details.all()]
-        return min(times) if times else None
-
 
 class OfferCreateUpdateSerializer(serializers.ModelSerializer):
     """Create/update serializer with nested details."""
@@ -94,21 +91,27 @@ class OfferCreateUpdateSerializer(serializers.ModelSerializer):
 
     def validate_details(self, value):
         if self.instance is None:
-            if len(value) != 3:
-                raise serializers.ValidationError('An offer must contain exactly 3 details.')
-            types = {d.get('offer_type') for d in value}
-            if types != {'basic', 'standard', 'premium'}:
-                raise serializers.ValidationError(
-                    'Offer details must include basic, standard and premium.'
-                )
+            self._validate_on_create(value)
         else:
-            allowed = {'basic', 'standard', 'premium'}
-            for detail in value:
-                if detail.get('offer_type') not in allowed:
-                    raise serializers.ValidationError(
-                        'Each detail must have a valid offer_type.'
-                    )
+            self._validate_on_update(value)
         return value
+
+    def _validate_on_create(self, value):
+        if len(value) != 3:
+            raise serializers.ValidationError('An offer must contain exactly 3 details.')
+        types = {d.get('offer_type') for d in value}
+        if types != {'basic', 'standard', 'premium'}:
+            raise serializers.ValidationError(
+                'Offer details must include basic, standard and premium.'
+            )
+
+    def _validate_on_update(self, value):
+        allowed = {'basic', 'standard', 'premium'}
+        for detail in value:
+            if detail.get('offer_type') not in allowed:
+                raise serializers.ValidationError(
+                    'Each detail must have a valid offer_type.'
+                )
 
     def create(self, validated_data):
         details_data = validated_data.pop('details')

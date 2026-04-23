@@ -1,6 +1,7 @@
 from django.db.models import Min
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 
 from core.pagination import LargeResultsSetPagination
@@ -47,14 +48,12 @@ class OfferListCreateView(generics.ListCreateAPIView):
         try:
             return queryset.filter(**{field: int(raw_value)})
         except (TypeError, ValueError):
-            from rest_framework.exceptions import ValidationError
             raise ValidationError({field: 'Must be a valid integer.'})
 
     def _filter_numeric(self, queryset, field, raw_value):
         try:
             return queryset.filter(**{field: float(raw_value)})
         except (TypeError, ValueError):
-            from rest_framework.exceptions import ValidationError
             raise ValidationError({field: 'Must be a valid number.'})
 
     def perform_create(self, serializer):

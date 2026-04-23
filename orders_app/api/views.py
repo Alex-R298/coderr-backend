@@ -24,22 +24,33 @@ class OrderListCreateView(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         """Creates an order based on the given offer_detail_id."""
-        offer_detail_id = request.data.get('offer_detail_id')
-        if not offer_detail_id:
-            return Response(
+        detail, error = self._resolve_offer_detail(request.data.get('offer_detail_id'))
+        if error is not None:
+            return error
+        order = self._build_order(request.user, detail)
+        serializer = self.get_serializer(order)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def _resolve_offer_detail(self, raw_id):
+        """Returns (OfferDetail, None) or (None, error Response)."""
+        if not raw_id:
+            return None, Response(
                 {'offer_detail_id': 'This field is required.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            detail_pk = int(offer_detail_id)
+            detail_pk = int(raw_id)
         except (TypeError, ValueError):
-            return Response(
+            return None, Response(
                 {'offer_detail_id': 'Must be a valid integer.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        detail = get_object_or_404(OfferDetail, pk=detail_pk)
-        order = Order.objects.create(
-            customer_user=request.user,
+        return get_object_or_404(OfferDetail, pk=detail_pk), None
+
+    def _build_order(self, customer, detail):
+        """Creates a new Order from an OfferDetail."""
+        return Order.objects.create(
+            customer_user=customer,
             business_user=detail.offer.user,
             title=detail.title,
             revisions=detail.revisions,
@@ -48,8 +59,6 @@ class OrderListCreateView(generics.ListCreateAPIView):
             features=detail.features,
             offer_type=detail.offer_type,
         )
-        serializer = self.get_serializer(order)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):

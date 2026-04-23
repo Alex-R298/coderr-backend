@@ -1,7 +1,10 @@
-# Third-party
+
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
+from rest_framework.authtoken.models import Token
+from profiles_app.models import UserProfile
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -16,19 +19,16 @@ class RegistrationSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
     def validate(self, attrs):
-        """Checks that both passwords match."""
+        """Checks password match and applies Django's built-in password validators."""
         if attrs['password'] != attrs['repeated_password']:
             raise serializers.ValidationError({'repeated_password': 'Passwords do not match.'})
+        validate_password(attrs['password'])
         return attrs
 
     def create(self, validated_data):
         """Creates user, profile and auth token."""
-        from profiles_app.models import UserProfile
-        from rest_framework.authtoken.models import Token
-
         profile_type = validated_data.pop('type')
         validated_data.pop('repeated_password')
-
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data.get('email', ''),
