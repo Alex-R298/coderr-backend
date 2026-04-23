@@ -28,7 +28,7 @@ class Order(models.Model):
         related_name='business_orders',
     )
     title = models.CharField(max_length=255)
-    revisions = models.PositiveIntegerField()
+    revisions = models.IntegerField()
     delivery_time_in_days = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
     features = models.JSONField(default=list)

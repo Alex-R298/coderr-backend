@@ -21,3 +21,11 @@ Thumbs.db
 
 # Environment variables
 .env
+
+# Coverage
+.coverage
+htmlcov/
+coverage.xml
+
+# Media uploads (dev only)
+media/
