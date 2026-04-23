@@ -36,12 +36,26 @@ class OfferListCreateView(generics.ListCreateAPIView):
         ).order_by('-created_at')
         params = self.request.query_params
         if params.get('creator_id'):
-            queryset = queryset.filter(user_id=params['creator_id'])
+            queryset = self._filter_int(queryset, 'user_id', params['creator_id'])
         if params.get('min_price'):
-            queryset = queryset.filter(min_price__gte=params['min_price'])
+            queryset = self._filter_numeric(queryset, 'min_price__gte', params['min_price'])
         if params.get('max_delivery_time'):
-            queryset = queryset.filter(min_delivery_time__lte=params['max_delivery_time'])
+            queryset = self._filter_int(queryset, 'min_delivery_time__lte', params['max_delivery_time'])
         return queryset
+
+    def _filter_int(self, queryset, field, raw_value):
+        try:
+            return queryset.filter(**{field: int(raw_value)})
+        except (TypeError, ValueError):
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({field: 'Must be a valid integer.'})
+
+    def _filter_numeric(self, queryset, field, raw_value):
+        try:
+            return queryset.filter(**{field: float(raw_value)})
+        except (TypeError, ValueError):
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({field: 'Must be a valid number.'})
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

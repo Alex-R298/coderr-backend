@@ -93,13 +93,21 @@ class OfferCreateUpdateSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'image', 'description', 'details']
 
     def validate_details(self, value):
-        if len(value) != 3:
-            raise serializers.ValidationError('An offer must contain exactly 3 details.')
-        types = {d.get('offer_type') for d in value}
-        if types != {'basic', 'standard', 'premium'}:
-            raise serializers.ValidationError(
-                'Offer details must include basic, standard and premium.'
-            )
+        if self.instance is None:
+            if len(value) != 3:
+                raise serializers.ValidationError('An offer must contain exactly 3 details.')
+            types = {d.get('offer_type') for d in value}
+            if types != {'basic', 'standard', 'premium'}:
+                raise serializers.ValidationError(
+                    'Offer details must include basic, standard and premium.'
+                )
+        else:
+            allowed = {'basic', 'standard', 'premium'}
+            for detail in value:
+                if detail.get('offer_type') not in allowed:
+                    raise serializers.ValidationError(
+                        'Each detail must have a valid offer_type.'
+                    )
         return value
 
     def create(self, validated_data):

@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
@@ -29,7 +30,14 @@ class OrderListCreateView(generics.ListCreateAPIView):
                 {'offer_detail_id': 'This field is required.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        detail = get_object_or_404(OfferDetail, pk=offer_detail_id)
+        try:
+            detail_pk = int(offer_detail_id)
+        except (TypeError, ValueError):
+            return Response(
+                {'offer_detail_id': 'Must be a valid integer.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        detail = get_object_or_404(OfferDetail, pk=detail_pk)
         order = Order.objects.create(
             customer_user=request.user,
             business_user=detail.offer.user,
@@ -58,6 +66,7 @@ class OrderCountView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, business_user_id):
+        get_object_or_404(User, pk=business_user_id, profile__type='business')
         count = Order.objects.filter(
             business_user_id=business_user_id, status='in_progress'
         ).count()
@@ -70,6 +79,7 @@ class CompletedOrderCountView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, business_user_id):
+        get_object_or_404(User, pk=business_user_id, profile__type='business')
         count = Order.objects.filter(
             business_user_id=business_user_id, status='completed'
         ).count()
